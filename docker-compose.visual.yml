@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  claude-oauth-api-visual:
+    build: .
+    container_name: claude-oauth-api-visual
+    ports:
+      - "8000:8000"
+      - "5900:5900"  # VNC port
+    environment:
+      - API_KEY=${API_KEY:-your-secure-api-key-here}
+      - CLAUDE_EMAIL=${CLAUDE_EMAIL}
+      - PYTHONUNBUFFERED=1
+      - DISPLAY=:99
+      - HEADLESS=false
+    volumes:
+      - ./logs:/app/logs
+      - playwright-data:/home/appuser/.cache/ms-playwright
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    restart: unless-stopped
+    networks:
+      - claude-network
+    command: >
+      sh -c "Xvfb :99 -screen 0 1280x720x24 &
+             x11vnc -display :99 -nopw -forever &
+             python main.py"
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: claude-oauth-ngrok
+    command: http claude-oauth-api-visual:8000 --authtoken=${NGROK_AUTHTOKEN}
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    ports:
+      - "4040:4040"
+    depends_on:
+      - claude-oauth-api-visual
+    networks:
+      - claude-network
+    restart: unless-stopped
+
+volumes:
+  playwright-data:
+
+networks:
+  claude-network:
+    driver: bridge
